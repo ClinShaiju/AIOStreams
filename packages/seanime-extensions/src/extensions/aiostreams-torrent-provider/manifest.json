@@ -1,7 +1,7 @@
 {
   "id": "aiostreams-torrent-provider",
   "name": "AIOStreams",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "manifestURI": "",
   "language": "typescript",
   "type": "anime-torrent-provider",
@@ -28,7 +28,7 @@
         "name": "searchId",
         "label": "AIOStreams Search ID",
         "type": "select",
-        "default": "imdbId",
+        "default": "kitsuId,imdbId",
         "options": [
           {
             "label": "IMDb ID",
@@ -41,6 +41,18 @@
           {
             "label": "AniList ID",
             "value": "anilistId"
+          },
+          {
+            "label": "Kitsu + IMDb",
+            "value": "kitsuId,imdbId"
+          },
+          {
+            "label": "AniList + IMDb",
+            "value": "anilistId,imdbId"
+          },
+          {
+            "label": "Kitsu + AniList + IMDb",
+            "value": "kitsuId,anilistId,imdbId"
           }
         ]
       },

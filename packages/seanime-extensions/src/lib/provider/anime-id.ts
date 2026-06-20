@@ -77,6 +77,45 @@ export function applyPreferredMapping(
   return parsedId;
 }
 
+/**
+ * Resolve the base parsed id to a single preferred id type (kitsu / anilist / imdb),
+ * returning a fresh ParsedId or null when that mapping is unavailable. Used to run one
+ * search per selected id type. Unlike applyPreferredMapping, this never falls back to
+ * imdb when the requested type is missing — the caller skips that strategy instead.
+ */
+export function buildSearchId(
+  baseId: ParsedId,
+  animeEntry: AIOStreamsAnimeEntry | null,
+  pref: PreferredSearchId
+): ParsedId | null {
+  const id: ParsedId = { ...baseId };
+
+  // Already the requested type (e.g. base anilistId + pref anilistId): use as-is.
+  if (pref === id.type) return id;
+  if (!animeEntry) return null;
+
+  if (pref === 'kitsuId' && animeEntry.mappings?.kitsuId) {
+    id.type = 'kitsuId';
+    id.value = String(animeEntry.mappings.kitsuId);
+    return id;
+  }
+
+  if (pref === 'anilistId' && animeEntry.mappings?.anilistId) {
+    id.type = 'anilistId';
+    id.value = String(animeEntry.mappings.anilistId);
+    return id;
+  }
+
+  if (pref === 'imdbId' && animeEntry.mappings?.imdbId) {
+    enrichParsedIdWithAnimeEntry(id, animeEntry);
+    id.type = 'imdbId';
+    id.value = String(animeEntry.mappings.imdbId);
+    return id;
+  }
+
+  return null;
+}
+
 export function enrichParsedIdWithAnimeEntry(
   parsedId: ParsedId,
   animeEntry: AIOStreamsAnimeEntry

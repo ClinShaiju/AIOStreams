@@ -24,6 +24,8 @@ export function toAnimeTorrent(
     link: result.url ?? '',
     magnetLink: buildMagnetLink(result) ?? undefined,
     infoHash: result.infoHash ?? undefined,
+    // Pre-resolved direct URL for results that have no infohash (debrid/http/usenet/external/live).
+    streamUrl: !result.infoHash && result.url ? result.url : undefined,
     resolution: result.parsedFile?.resolution,
     episodeNumber: result.parsedFile?.episodes?.length
       ? Number(result.parsedFile.episodes[0])

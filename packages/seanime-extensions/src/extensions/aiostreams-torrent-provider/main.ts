@@ -2,9 +2,10 @@ import {
   AIOStreamsAPI,
   parseManifestUrl,
   ParsedId,
+  SearchApiResponse,
 } from '../../lib/aiostreams';
 import {
-  applyPreferredMapping,
+  buildSearchId,
   createParsedIdFromSmartSearch,
   formatIdForSearch,
   PreferredSearchId,
@@ -68,33 +69,67 @@ class Provider {
       return [];
     }
 
-    if (id.type !== 'stremioId') {
-      const animeEntry = await aiostreams.anime(id.type, id.value);
-      if (animeEntry) {
-        applyPreferredMapping(
-          id,
-          animeEntry,
-          $getUserPreference('searchId') as PreferredSearchId
-        );
-        if (type === 'movie') {
-          id.season = undefined;
-          id.episode = undefined;
-        }
+    const resultFormat = $getUserPreference('resultFormat') as ResultFormat;
+    const seen = new Set<string>();
+    const collected: AnimeTorrent[] = [];
+    const collect = (response: SearchApiResponse | null) => {
+      for (const item of response?.results ?? []) {
+        const torrent = toAnimeTorrent(item, resultFormat);
+        // Keep p2p/torrent results (infoHash) AND pre-resolved direct streams (streamUrl).
+        if (!torrent.infoHash && !torrent.streamUrl) continue;
+        const key = torrent.infoHash || torrent.streamUrl || torrent.name;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        collected.push(torrent);
       }
+    };
+
+    if (id.type === 'stremioId') {
+      collect(
+        await aiostreams.search(
+          type,
+          formatIdForSearch(id),
+          id.season,
+          id.episode
+        )
+      );
+      return collected;
     }
 
-    const response = await aiostreams.search(
-      type,
-      formatIdForSearch(id),
-      id.season,
-      id.episode
+    // searchId may be a comma-joined list (e.g. "kitsuId,imdbId"). Resolve the title once,
+    // then query AIOStreams once per id type. kitsu/anilist ids hit the anime scrapers
+    // (Nyaa/AnimeTosho/SeaDex); imdb hits the generic ones. Fire them in parallel and merge.
+    const animeEntry = await aiostreams.anime(id.type, id.value);
+    const prefs = ((($getUserPreference('searchId') as string) || 'imdbId')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean) as PreferredSearchId[]);
+    if (prefs.length === 0) prefs.push('imdbId');
+
+    const responses = await Promise.all(
+      prefs.flatMap((pref) => {
+        const sid = buildSearchId(id, animeEntry, pref);
+        if (!sid) return [];
+        let season = sid.season;
+        let episode = sid.episode;
+        if (type === 'movie') {
+          season = undefined;
+          episode = undefined;
+        }
+        // Swallow per-id failures so one bad strategy can't sink the others.
+        return [
+          aiostreams
+            .search(type, formatIdForSearch(sid), season, episode)
+            .then(
+              (r) => r,
+              () => null
+            ),
+        ];
+      })
     );
 
-    return response.results
-      .map((item) =>
-        toAnimeTorrent(item, $getUserPreference('resultFormat') as ResultFormat)
-      )
-      .filter((torrent) => torrent.infoHash);
+    for (const response of responses) collect(response);
+    return collected;
   }
 
   async getTorrentInfoHash(torrent: AnimeTorrent): Promise<string> {

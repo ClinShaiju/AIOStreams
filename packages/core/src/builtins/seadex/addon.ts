@@ -125,6 +125,14 @@ export class SeaDexAddon extends BaseDebridAddon<SeaDexAddonConfig> {
           group: torrent.releaseGroup,
           age,
           indexer: torrent.tracker,
+          // SeaDex flags dual-audio releases (JP original + English dub) in its DB, but the
+          // release filenames frequently carry no language token (e.g. "...FLAC2.0.H.264-Meakes"),
+          // so downstream title parsing finds none and the stream shows no language. Seed the
+          // languages from SeaDex's authoritative dualAudio flag — they get unioned with any real
+          // debrid track languages downstream and surface as flag emoji (→ "Original + Dub").
+          parsedMediaInfo: torrent.dualAudio
+            ? { languages: ['Japanese', 'English'] }
+            : undefined,
           sources:
             torrent.tracker === 'Nyaa'
               ? [

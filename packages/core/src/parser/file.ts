@@ -63,6 +63,13 @@ class FileParser {
   );
 
   static parse(filename: string): ParsedFile {
+    // Strip file-size tokens ("465 MB", "1.4GiB", "55.3 GB") before parsing. Otherwise the size
+    // number can be misread as an episode/season by the title parser (e.g. "465 MB" → episode 465).
+    // Size is carried separately as a numeric field, so the displayed 📦 size badge is unaffected.
+    filename = filename
+      .replace(/\b\d+(?:\.\d+)?\s*[KMGT]i?B\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     const parsed = this.parser.parse(filename);
     if (
       ['vinland', 'furiosaamadmax', 'horizonanamerican'].includes(
